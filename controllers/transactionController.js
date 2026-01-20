@@ -2,6 +2,7 @@ const Transaction = require('../models/Transaction');
 const TransactionItem = require('../models/TransactionItem');
 const Product = require('../models/Product');
 const sequelize = require('../config/db');
+const { Op } = require('sequelize');
 
 exports.createTransaction = async (req, res) => {
     const t = await sequelize.transaction();
@@ -57,12 +58,38 @@ exports.createTransaction = async (req, res) => {
 
 exports.getTransactions = async (req, res) => {
     try {
+        const { startDate, endDate, namaPelanggan } = req.query;
+        let whereClause = { shop_id: req.user.shop_id };
+
+        if (startDate && endDate) {
+            whereClause.tanggal = {
+                [Op.between]: [new Date(startDate), new Date(endDate)]
+            };
+        }
+
+        if (namaPelanggan && namaPelanggan !== 'Semua') {
+            whereClause.nama_pelanggan = namaPelanggan;
+        }
+
         const transactions = await Transaction.findAll({
-            where: { shop_id: req.user.shop_id },
+            where: whereClause,
             include: [{ model: TransactionItem }],
-            order: [['createdAt', 'DESC']]
+            order: [['tanggal', 'DESC']]
         });
         res.json(transactions);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+exports.getCustomerNames = async (req, res) => {
+    try {
+        const customers = await Transaction.findAll({
+            where: { shop_id: req.user.shop_id },
+            attributes: [[sequelize.fn('DISTINCT', sequelize.col('nama_pelanggan')), 'nama_pelanggan']],
+            raw: true
+        });
+        res.json(customers.map(c => c.nama_pelanggan || "Umum"));
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

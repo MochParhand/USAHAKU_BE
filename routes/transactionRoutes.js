@@ -7,5 +7,6 @@ router.use(verifyToken);
 
 router.post('/', transactionController.createTransaction);
 router.get('/', transactionController.getTransactions);
+router.get('/customers', transactionController.getCustomerNames);
 
 module.exports = router;

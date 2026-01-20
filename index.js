@@ -17,13 +17,20 @@ const Product = require('./models/Product');
 const Transaction = require('./models/Transaction');
 const TransactionItem = require('./models/TransactionItem');
 
+const Purchase = require('./models/Purchase');
+const PurchaseItem = require('./models/PurchaseItem');
+
 // --- ASSOCIATIONS ---
 Product.belongsTo(Category, { foreignKey: 'kategori_id' });
 Category.hasMany(Product, { foreignKey: 'kategori_id' });
-// Add other associations if needed (e.g. Transaction -> TransactionItem)
+
 Transaction.hasMany(TransactionItem, { foreignKey: 'transaction_id' });
 TransactionItem.belongsTo(Transaction, { foreignKey: 'transaction_id' });
 TransactionItem.belongsTo(Product, { foreignKey: 'product_id' });
+
+Purchase.hasMany(PurchaseItem, { foreignKey: 'purchase_id' });
+PurchaseItem.belongsTo(Purchase, { foreignKey: 'purchase_id' });
+PurchaseItem.belongsTo(Product, { foreignKey: 'product_id' });
 
 const app = express();
 
@@ -45,6 +52,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/shift', shiftRoutes);
 app.use('/api/reports', require('./routes/reportRoutes'));
+app.use('/api/purchases', require('./routes/purchaseRoutes'));
 
 // --- TEST ROUTE (Agar tidak muncul "Cannot GET /") ---
 app.get('/', (req, res) => {
@@ -93,7 +101,8 @@ sequelize.sync({ alter: true })
 
 // Handle graceful shutdown
 process.on('SIGINT', () => {
-    console.log('Received SIGINT. Press Control-D to exit.');
+    console.log('Shutting down server...');
+    process.exit(0);
 });
 
 // --- GLOBAL ERROR HANDLERS (Prevent Crash) ---
