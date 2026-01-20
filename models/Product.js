@@ -48,6 +48,10 @@ const Product = sequelize.define('Product', {
       model: 'Shops',
       key: 'id'
     }
+  },
+  is_deleted: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
   }
 });
 

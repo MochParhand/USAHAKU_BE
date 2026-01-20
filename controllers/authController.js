@@ -102,3 +102,79 @@ exports.addStaff = async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 };
+
+// 4. GET PROFILE
+exports.getProfile = async (req, res) => {
+    try {
+        const user = await User.findByPk(req.user.id, {
+            attributes: { exclude: ['password'] }
+        });
+        if (!user) return res.status(404).json({ error: "User tidak ditemukan" });
+        res.json(user);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// 5. UPDATE PROFILE
+exports.updateProfile = async (req, res) => {
+    try {
+        const { nama, email } = req.body;
+        const user = await User.findByPk(req.user.id);
+        
+        if (!user) return res.status(404).json({ error: "User tidak ditemukan" });
+
+        // Cek email unique jika berubah
+        if (email && email !== user.email) {
+            const existingUser = await User.findOne({ where: { email } });
+            if (existingUser) return res.status(400).json({ error: "Email sudah digunakan user lain" });
+            user.email = email;
+        }
+
+        if (nama) user.nama = nama;
+
+        await user.save();
+
+        res.json({ message: "Profil berhasil diperbarui", user: { id: user.id, nama: user.nama, email: user.email, role: user.role } });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// 6. GET EMPLOYEES (Owner Only)
+exports.getEmployees = async (req, res) => {
+    try {
+        // req.user.shop_id comes from token
+        const employees = await User.findAll({
+            where: {
+                shop_id: req.user.shop_id,
+                role: 'kasir'
+            },
+            attributes: { exclude: ['password'] }
+        });
+        res.json(employees);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// 7. DELETE EMPLOYEE (Owner Only)
+exports.deleteEmployee = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const employee = await User.findOne({ 
+            where: { 
+                id, 
+                shop_id: req.user.shop_id,
+                role: 'kasir' 
+            } 
+        });
+
+        if (!employee) return res.status(404).json({ error: "Karyawan tidak ditemukan atau bukan milik Anda" });
+
+        await employee.destroy();
+        res.json({ message: "Karyawan berhasil dihapus" });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};

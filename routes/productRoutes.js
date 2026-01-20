@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const productController = require('../controllers/productController');
-const { verifyToken } = require('../middleware/authMiddleware');
+const { verifyToken, isOwner } = require('../middleware/authMiddleware');
 const multer = require('multer');
 const path = require('path');
 
@@ -21,14 +21,16 @@ const upload = multer({ storage: storage });
 router.use(verifyToken);
 
 // Categories
-router.get('/categories', productController.getCategories);
-router.post('/categories', productController.createCategory);
-router.delete('/categories/:id', productController.deleteCategory);
+router.get('/categories', productController.getCategories); // Kasir & Owner
+router.post('/categories', isOwner, productController.createCategory); // Owner Only
+router.put('/categories/:id', isOwner, productController.updateCategory); // Owner Only
+router.delete('/categories/:id', isOwner, productController.deleteCategory); // Owner Only
 
 // Products
-router.get('/', productController.getProducts);
-router.post('/', upload.single('image'), productController.createProduct);
-router.put('/:id', upload.single('image'), productController.updateProduct);
-router.delete('/:id', productController.deleteProduct);
+router.get('/low-stock', productController.getLowStockProducts); // Kasir & Owner
+router.get('/', productController.getProducts); // Kasir & Owner
+router.post('/', isOwner, upload.single('image'), productController.createProduct); // Owner Only
+router.put('/:id', isOwner, upload.single('image'), productController.updateProduct); // Owner Only
+router.delete('/:id', isOwner, productController.deleteProduct); // Owner Only
 
 module.exports = router;

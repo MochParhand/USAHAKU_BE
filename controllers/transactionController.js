@@ -26,6 +26,9 @@ exports.createTransaction = async (req, res) => {
             if (!product) {
                 throw new Error(`Product ID ${item.barangId} not found`);
             }
+            if (product.is_deleted) {
+                throw new Error(`Product ${product.nama} has been deleted/archived and cannot be sold`);
+            }
             if (product.stok < item.qty) {
                 throw new Error(`Stock not sufficient for product ${product.nama}`);
             }

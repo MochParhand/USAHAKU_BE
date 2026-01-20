@@ -1,7 +1,14 @@
 const express = require('express');
+const fs = require('fs'); // Ensure uploads folder exists
+if (!fs.existsSync('uploads')) {
+  fs.mkdirSync('uploads');
+}
 const cors = require('cors');
 const sequelize = require('./config/db');
 const authRoutes = require('./routes/authRoutes');
+const productRoutes = require('./routes/productRoutes');
+const transactionRoutes = require('./routes/transactionRoutes');
+const shiftRoutes = require('./routes/shiftRoutes');
 
 const Shop = require('./models/Shop');
 const User = require('./models/User');
@@ -34,8 +41,10 @@ app.use((req, res, next) => {
 // --- ROUTES ---
 app.use('/uploads', express.static('uploads')); // Serve uploaded files
 app.use('/api/auth', authRoutes);
-app.use('/api/products', require('./routes/productRoutes'));
-app.use('/api/transactions', require('./routes/transactionRoutes'));
+app.use('/api/products', productRoutes);
+app.use('/api/transactions', transactionRoutes);
+app.use('/api/shift', shiftRoutes);
+app.use('/api/reports', require('./routes/reportRoutes'));
 
 // --- TEST ROUTE (Agar tidak muncul "Cannot GET /") ---
 app.get('/', (req, res) => {
@@ -49,14 +58,50 @@ app.use((req, res) => {
 });
 
 // --- DATABASE SYNC & START SERVER ---
-sequelize.sync({ alter: true }) 
-.then(() => {
-    console.log('Database PostgreSQL terhubung & Sinkron');
-    // Gunakan port 3000 dan host 0.0.0.0 agar bisa diakses IP lokal
-    app.listen(3000, '0.0.0.0', () => {
-        console.log('Server running on http://localhost:3000');
+sequelize.sync({ alter: true })
+    .then(() => {
+        console.log('Database PostgreSQL terhubung & Sinkron');
+        const DEFAULT_PORT = parseInt(process.env.PORT) || 3000;
+        const MAX_RETRIES = 5;
+        let attempt = 0;
+        const startServer = (port) => {
+            const server = app.listen(port, '0.0.0.0', () => {
+                console.log(`Server running on http://localhost:${port}`);
+            });
+            // Store server globally for graceful shutdown
+            global.__server = server;
+            server.on('error', (e) => {
+                if (e.code === 'EADDRINUSE' && attempt < MAX_RETRIES) {
+                    console.error(`Port ${port} already in use, trying next port...`);
+                    attempt++;
+                    startServer(port + 1);
+                } else {
+                    console.error('SERVER ERROR:', e);
+                }
+            });
+        };
+        startServer(DEFAULT_PORT);
+        // FORCE KEEP ALIVE: Prevent process from exiting if event loop empties
+        setInterval(() => {
+            // Heartbeat to keep process running
+        }, 60000);
+    })
+    .catch(err => {
+        console.log('Gagal koneksi DB: ' + err);
     });
-})
-.catch(err => {
-    console.log('Gagal koneksi DB: ' + err);
+
+
+// Handle graceful shutdown
+process.on('SIGINT', () => {
+    console.log('Received SIGINT. Press Control-D to exit.');
+});
+
+// --- GLOBAL ERROR HANDLERS (Prevent Crash) ---
+process.on('uncaughtException', (err) => {
+    console.error('[CRITICAL] Uncaught Exception:', err);
+    // Optional: Graceful shutdown logic here if needed, but for dev we keep it alive
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('[CRITICAL] Unhandled Rejection at:', promise, 'reason:', reason);
 });
