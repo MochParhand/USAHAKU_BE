@@ -109,4 +109,4 @@ process.on('unhandledRejection', (reason, promise) => {
     console.error('[CRITICAL] Unhandled Rejection:', reason);
 });
 
-module
+module.exports = app;
