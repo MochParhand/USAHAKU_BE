@@ -69,6 +69,7 @@ exports.getSalesReport = async (req, res) => {
 
         const transactions = await Transaction.findAll({
             where: whereClause,
+            include: [{ model: TransactionItem }],
             order: [['tanggal', 'DESC']]
         });
 

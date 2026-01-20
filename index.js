@@ -1,24 +1,30 @@
 const express = require('express');
-const fs = require('fs'); // Ensure uploads folder exists
-if (!fs.existsSync('uploads')) {
-  fs.mkdirSync('uploads');
-}
+const fs = require('fs');
+const path = require('path'); // Gunakan path untuk folder upload agar lebih aman
 const cors = require('cors');
-const sequelize = require('./config/db');
-const authRoutes = require('./routes/authRoutes');
-const productRoutes = require('./routes/productRoutes');
-const transactionRoutes = require('./routes/transactionRoutes');
-const shiftRoutes = require('./routes/shiftRoutes');
+const sequelize = require('./config/db'); // Pastikan ini file Sequelize yang pakai DATABASE_URL tadi
 
+// Pastikan folder uploads ada
+const uploadDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir);
+}
+
+// --- MODELS ---
 const Shop = require('./models/Shop');
 const User = require('./models/User');
 const Category = require('./models/Category');
 const Product = require('./models/Product');
 const Transaction = require('./models/Transaction');
 const TransactionItem = require('./models/TransactionItem');
-
 const Purchase = require('./models/Purchase');
 const PurchaseItem = require('./models/PurchaseItem');
+
+// --- ROUTES ---
+const authRoutes = require('./routes/authRoutes');
+const productRoutes = require('./routes/productRoutes');
+const transactionRoutes = require('./routes/transactionRoutes');
+const shiftRoutes = require('./routes/shiftRoutes');
 
 // --- ASSOCIATIONS ---
 Product.belongsTo(Category, { foreignKey: 'kategori_id' });
@@ -35,18 +41,17 @@ PurchaseItem.belongsTo(Product, { foreignKey: 'product_id' });
 const app = express();
 
 // --- MIDDLEWARE ---
-// Pastikan cors() di atas rute apa pun!
 app.use(cors()); 
 app.use(express.json());
 
-// Tambahkan Logging sederhana untuk memantau request yang masuk
+// Logging Request
 app.use((req, res, next) => {
     console.log(`[${new Date().toLocaleString()}] ${req.method} ke ${req.url}`);
     next();
 });
 
-// --- ROUTES ---
-app.use('/uploads', express.static('uploads')); // Serve uploaded files
+// --- ROUTES SETUP ---
+app.use('/uploads', express.static('uploads'));
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/transactions', transactionRoutes);
@@ -54,50 +59,35 @@ app.use('/api/shift', shiftRoutes);
 app.use('/api/reports', require('./routes/reportRoutes'));
 app.use('/api/purchases', require('./routes/purchaseRoutes'));
 
-// --- TEST ROUTE (Agar tidak muncul "Cannot GET /") ---
 app.get('/', (req, res) => {
-    res.json({ message: "Server Usahaku BE Berjalan Lancar!" });
+    res.json({ 
+        message: "Server Usahaku BE Berjalan Lancar!",
+        database: "Connected to Neon PostgreSQL" 
+    });
 });
 
-// --- CATCH-ALL ROUTE (Jika URL salah panggil) ---
 app.use((req, res) => {
-    console.log(`WASTED: Seseorang memanggil ${req.url} tapi tidak ada rutenya!`);
     res.status(404).json({ error: "Rute tidak ditemukan. Cek baseUrl di Flutter!" });
 });
 
 // --- DATABASE SYNC & START SERVER ---
+// Gunakan alter: true untuk development agar tabel otomatis dibuat di Neon
 sequelize.sync({ alter: true })
     .then(() => {
-        console.log('Database PostgreSQL terhubung & Sinkron');
-        const DEFAULT_PORT = parseInt(process.env.PORT) || 3000;
-        const MAX_RETRIES = 5;
-        let attempt = 0;
-        const startServer = (port) => {
-            const server = app.listen(port, '0.0.0.0', () => {
-                console.log(`Server running on http://localhost:${port}`);
-            });
-            // Store server globally for graceful shutdown
-            global.__server = server;
-            server.on('error', (e) => {
-                if (e.code === 'EADDRINUSE' && attempt < MAX_RETRIES) {
-                    console.error(`Port ${port} already in use, trying next port...`);
-                    attempt++;
-                    startServer(port + 1);
-                } else {
-                    console.error('SERVER ERROR:', e);
-                }
-            });
-        };
-        startServer(DEFAULT_PORT);
-        // FORCE KEEP ALIVE: Prevent process from exiting if event loop empties
-        setInterval(() => {
-            // Heartbeat to keep process running
-        }, 60000);
+        console.log('✅ Database Neon PostgreSQL terhubung & Sinkron');
+        
+        // Render biasanya memberikan PORT melalui process.env.PORT
+        // Di lokal akan default ke 3000
+        const PORT = process.env.PORT || 3000;
+        
+        app.listen(PORT, '0.0.0.0', () => {
+            console.log(`🚀 Server running on port ${PORT}`);
+            console.log(`📡 Database URL: ${process.env.DATABASE_URL ? 'Neon Cloud' : 'Not Found'}`);
+        });
     })
     .catch(err => {
-        console.log('Gagal koneksi DB: ' + err);
+        console.error('❌ Gagal koneksi DB:', err);
     });
-
 
 // Handle graceful shutdown
 process.on('SIGINT', () => {
@@ -105,12 +95,11 @@ process.on('SIGINT', () => {
     process.exit(0);
 });
 
-// --- GLOBAL ERROR HANDLERS (Prevent Crash) ---
+// --- GLOBAL ERROR HANDLERS ---
 process.on('uncaughtException', (err) => {
     console.error('[CRITICAL] Uncaught Exception:', err);
-    // Optional: Graceful shutdown logic here if needed, but for dev we keep it alive
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-    console.error('[CRITICAL] Unhandled Rejection at:', promise, 'reason:', reason);
+    console.error('[CRITICAL] Unhandled Rejection:', reason);
 });
