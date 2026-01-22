@@ -13,6 +13,10 @@ const Category = sequelize.define("Category", {
       key: "id",
     },
   },
+  is_deleted: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
+  }
 });
 
 module.exports = Category;

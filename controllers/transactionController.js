@@ -33,7 +33,7 @@ exports.createTransaction = async (req, res) => {
             if (product.stok < item.qty) {
                 throw new Error(`Stock not sufficient for product ${product.nama}`);
             }
-            
+
             await product.update({ stok: product.stok - item.qty }, { transaction: t });
 
             // Create Transaction Item
@@ -58,12 +58,20 @@ exports.createTransaction = async (req, res) => {
 
 exports.getTransactions = async (req, res) => {
     try {
-        const { startDate, endDate, namaPelanggan } = req.query;
+        let { startDate, endDate, namaPelanggan, page, limit } = req.query;
         let whereClause = { shop_id: req.user.shop_id };
 
+        // Pagination
+        page = parseInt(page) || 1;
+        limit = parseInt(limit) || 20; // Smaller limit for history list
+        const offset = (page - 1) * limit;
+
         if (startDate && endDate) {
+            const end = new Date(endDate);
+            end.setHours(23, 59, 59, 999);
+
             whereClause.tanggal = {
-                [Op.between]: [new Date(startDate), new Date(endDate)]
+                [Op.between]: [new Date(startDate), end]
             };
         }
 
@@ -71,11 +79,20 @@ exports.getTransactions = async (req, res) => {
             whereClause.nama_pelanggan = namaPelanggan;
         }
 
-        const transactions = await Transaction.findAll({
+        const { count, rows: transactions } = await Transaction.findAndCountAll({
             where: whereClause,
-            include: [{ model: TransactionItem }],
+            attributes: ['id', 'total_bayar', 'bayar', 'kembalian', 'pelanggan_id', 'nama_pelanggan', 'tanggal'],
+            include: [{
+                model: TransactionItem,
+                attributes: ['id', 'product_id', 'qty', 'harga', 'subtotal', 'nama_barang']
+            }],
+            limit: limit,
+            offset: offset,
             order: [['tanggal', 'DESC']]
         });
+
+        res.set('X-Total-Count', count);
+        res.set('X-Total-Pages', Math.ceil(count / limit));
         res.json(transactions);
     } catch (error) {
         res.status(500).json({ error: error.message });

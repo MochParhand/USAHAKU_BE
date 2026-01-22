@@ -2,6 +2,8 @@ const Shift = require('../models/Shift');
 const Transaction = require('../models/Transaction'); // Assuming this exists to calc expected cash
 const { Op } = require('sequelize');
 
+console.log(">>> LOADED SHIFT CONTROLLER (total_bayar FIX) <<<");
+
 exports.openShift = async (req, res) => {
     try {
         const { initialCash, shopId: bodyShopId } = req.body;
@@ -58,17 +60,17 @@ exports.closeShift = async (req, res) => {
         }
 
         // Calculate total sales during this shift
-        // Assuming Transaction has 'createdAt' and 'totalAmount'
-        // We sum transactions created between currentShift.startTime and NOW
-        
+        // Use 'total_bayar' and 'tanggal' as per Transaction model
+        // Filter by shop_id instead of userId as Transaction doesn't have userId yet
+        // Create endTime here
         const endTime = new Date();
-        
-        // This calculation depends on Transaction model implementation. 
-        // Assuming basic Sum.
-        const totalSales = await Transaction.sum('totalAmount', {
+
+        const shop_id = req.user.shop_id;
+
+        const totalSales = await Transaction.sum('total_bayar', {
             where: {
-                userId, // Only this cashier's transactions? Or shop's? Usually Shift is per Cashier.
-                createdAt: {
+                shop_id: shop_id, 
+                tanggal: {
                     [Op.gte]: currentShift.startTime,
                     [Op.lte]: endTime
                 }
@@ -120,10 +122,13 @@ exports.getShiftSummary = async (req, res) => {
         const endTime = new Date();
         
         // Calculate Sales
-        const totalSales = await Transaction.sum('totalAmount', {
+        // Use 'total_bayar' and 'tanggal' per Transaction model
+        const shop_id = req.user.shop_id;
+        
+        const totalSales = await Transaction.sum('total_bayar', {
             where: {
-                userId, 
-                createdAt: {
+                shop_id: shop_id,
+                tanggal: {
                     [Op.gte]: currentShift.startTime,
                     [Op.lte]: endTime
                 }

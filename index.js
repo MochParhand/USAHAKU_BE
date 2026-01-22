@@ -2,6 +2,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
+const compression = require('compression');
 const sequelize = require('./config/db');
 
 // --- 1. IMPORT SEMUA ROUTES ---
@@ -11,6 +12,7 @@ const transactionRoutes = require('./routes/transactionRoutes');
 const shiftRoutes = require('./routes/shiftRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const purchaseRoutes = require('./routes/purchaseRoutes');
+const syncRoutes = require('./routes/syncRoutes');
 
 // --- 2. KONFIGURASI FOLDER UPLOADS ---
 const uploadDir = path.join(__dirname, 'uploads');
@@ -27,6 +29,7 @@ const Transaction = require('./models/Transaction');
 const TransactionItem = require('./models/TransactionItem');
 const Purchase = require('./models/Purchase');
 const PurchaseItem = require('./models/PurchaseItem');
+const Shift = require('./models/Shift');
 
 // --- 4. ASSOCIATIONS (RELASI TABEL) ---
 Product.belongsTo(Category, { foreignKey: 'kategori_id' });
@@ -40,10 +43,17 @@ Purchase.hasMany(PurchaseItem, { foreignKey: 'purchase_id' });
 PurchaseItem.belongsTo(Purchase, { foreignKey: 'purchase_id' });
 PurchaseItem.belongsTo(Product, { foreignKey: 'product_id' });
 
+Shift.belongsTo(User, { foreignKey: 'userId' });
+User.hasMany(Shift, { foreignKey: 'userId' });
+
+User.belongsTo(Shop, { foreignKey: 'shop_id' });
+Shop.hasMany(User, { foreignKey: 'shop_id' });
+
 const app = express();
 
 // --- 5. MIDDLEWARE ---
-app.use(cors()); 
+app.use(cors());
+app.use(compression());
 app.use(express.json());
 
 // Logging Request sederhana
@@ -53,19 +63,20 @@ app.use((req, res, next) => {
 });
 
 // --- 6. ROUTES SETUP ---
-app.use('/uploads', express.static('uploads')); 
+app.use('/uploads', express.static('uploads'));
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/shift', shiftRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/purchases', purchaseRoutes);
+app.use('/api/sync', syncRoutes);
 
 // Test Route
 app.get('/', (req, res) => {
-    res.json({ 
+    res.json({
         message: "Server Usahaku BE Berjalan Lancar!",
-        database: "Connected to Neon PostgreSQL" 
+        database: "Connected to Neon PostgreSQL"
     });
 });
 
@@ -79,11 +90,11 @@ if (process.env.NODE_ENV !== 'vercel') {
     // Jalankan ini jika di Lokal atau Render
     sequelize.sync({ alter: true })
         .then(() => {
-            console.log('Database Neon PostgreSQL terhubung dan Sinkron');
+            console.log('Database PostgreSQL terhubung dan Sinkron');
             const PORT = process.env.PORT || 3000;
             app.listen(PORT, '0.0.0.0', () => {
                 console.log(`Server running on port ${PORT}`);
-                console.log(`Database URL: ${process.env.DATABASE_URL ? 'Neon Cloud Terdeteksi' : 'Lokal'}`);
+                console.log(`Database URL: ${process.env.DATABASE_URL.includes('neon') ? 'Neon Cloud Terdeteksi' : 'Lokal (PostgreSQL)'}`);
             });
         })
         .catch(err => {

@@ -6,9 +6,9 @@ const sequelize = new Sequelize(process.env.DATABASE_URL, {
   dialectModule: require('pg'), // TAMBAHKAN BARIS INI agar tidak error di Vercel
   logging: false,
   dialectOptions: {
-    ssl: {
+    ssl: process.env.DATABASE_URL.includes('localhost') ? false : {
       require: true,
-      rejectUnauthorized: false // Tetap ada agar tidak error SSL saat konek ke Neon
+      rejectUnauthorized: false
     }
   }
 });

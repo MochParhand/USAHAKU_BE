@@ -3,7 +3,8 @@ const sequelize = require('../config/db');
 
 const Shop = sequelize.define('Shop', {
   nama_toko: { type: DataTypes.STRING, allowNull: false },
-  alamat: { type: DataTypes.TEXT }
+  alamat: { type: DataTypes.TEXT },
+  logo: { type: DataTypes.STRING, allowNull: true }
 });
 
 module.exports = Shop;

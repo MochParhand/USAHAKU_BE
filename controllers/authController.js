@@ -44,7 +44,10 @@ exports.registerOwner = async (req, res) => {
 exports.login = async (req, res) => {
     try {
         const { email, password } = req.body;
-        const user = await User.findOne({ where: { email } });
+        const user = await User.findOne({
+            where: { email },
+            include: [{ model: Shop, attributes: ['nama_toko', 'logo'] }]
+        });
 
         if (!user) return res.status(404).json({ error: "User tidak ditemukan" });
 
@@ -63,7 +66,9 @@ exports.login = async (req, res) => {
                 id: user.id,
                 nama: user.nama,
                 role: user.role,
-                shop_id: user.shop_id
+                shop_id: user.shop_id,
+                shop_name: user.Shop ? user.Shop.nama_toko : "Toko Saya",
+                shop_logo: user.Shop ? user.Shop.logo : null
             }
         });
     } catch (error) {
@@ -94,9 +99,9 @@ exports.addStaff = async (req, res) => {
             shop_id: ownerShopId
         });
 
-        res.status(201).json({ 
-            message: "Staff berhasil ditambahkan", 
-            staffId: newStaff.id 
+        res.status(201).json({
+            message: "Staff berhasil ditambahkan",
+            staffId: newStaff.id
         });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -107,7 +112,8 @@ exports.addStaff = async (req, res) => {
 exports.getProfile = async (req, res) => {
     try {
         const user = await User.findByPk(req.user.id, {
-            attributes: { exclude: ['password'] }
+            attributes: { exclude: ['password'] },
+            include: [{ model: Shop, attributes: ['nama_toko', 'logo', 'alamat'] }]
         });
         if (!user) return res.status(404).json({ error: "User tidak ditemukan" });
         res.json(user);
@@ -121,7 +127,7 @@ exports.updateProfile = async (req, res) => {
     try {
         const { nama, email } = req.body;
         const user = await User.findByPk(req.user.id);
-        
+
         if (!user) return res.status(404).json({ error: "User tidak ditemukan" });
 
         // Cek email unique jika berubah
@@ -162,12 +168,12 @@ exports.getEmployees = async (req, res) => {
 exports.deleteEmployee = async (req, res) => {
     try {
         const { id } = req.params;
-        const employee = await User.findOne({ 
-            where: { 
-                id, 
+        const employee = await User.findOne({
+            where: {
+                id,
                 shop_id: req.user.shop_id,
-                role: 'kasir' 
-            } 
+                role: 'kasir'
+            }
         });
 
         if (!employee) return res.status(404).json({ error: "Karyawan tidak ditemukan atau bukan milik Anda" });
@@ -175,6 +181,62 @@ exports.deleteEmployee = async (req, res) => {
         await employee.destroy();
         res.json({ message: "Karyawan berhasil dihapus" });
     } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// 8. CHANGE PASSWORD
+exports.changePassword = async (req, res) => {
+    try {
+        const { oldPassword, newPassword } = req.body;
+        const user = await User.findByPk(req.user.id);
+
+        if (!user) return res.status(404).json({ error: "User tidak ditemukan" });
+
+        // Verify Old Password
+        const isMatch = await bcrypt.compare(oldPassword, user.password);
+        if (!isMatch) return res.status(400).json({ error: "Password lama salah" });
+
+        // Hash New Password
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        user.password = hashedPassword;
+        await user.save();
+
+        res.json({ message: "Password berhasil diubah" });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// 9. UPDATE LOGO TOKO (Owner Only)
+exports.updateLogo = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: "Tidak ada file yang diupload" });
+        }
+
+        const shopId = req.user.shop_id;
+        const shop = await Shop.findByPk(shopId);
+
+        if (!shop) {
+            return res.status(404).json({ error: "Toko tidak ditemukan" });
+        }
+
+        // Simpan path relatif atau full URL tergantung kebutuhan
+        // Di sini simpan path relatif: 'uploads/filename.jpg'
+        // Nanti frontend tinggal gabungin dengan Base URL
+        const logoPath = req.file.path.replace(/\\/g, "/"); // Normalize path for Windows/Unix compatibility
+
+        shop.logo = logoPath;
+        await shop.save();
+
+        res.json({
+            message: "Logo berhasil diupload",
+            logoUrl: logoPath
+        });
+
+    } catch (error) {
+        console.error("Error upload logo:", error);
         res.status(500).json({ error: error.message });
     }
 };

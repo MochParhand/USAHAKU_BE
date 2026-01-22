@@ -32,6 +32,10 @@ const Transaction = sequelize.define('Transaction', {
       model: 'Shops',
       key: 'id'
     }
+  },
+  is_deleted: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
   }
 });
 
