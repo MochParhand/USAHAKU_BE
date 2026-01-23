@@ -43,4 +43,6 @@ const config = {
 module.exports = sequelize;
 
 // Named export for sequelize-cli (config object)
-module.exports.config = config;
+// The CLI expects either the config object directly or a function
+module.exports.development = config.development;
+module.exports.production = config.production;
