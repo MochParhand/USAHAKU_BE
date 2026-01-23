@@ -24,6 +24,14 @@ const Purchase = sequelize.define('Purchase', {
       model: 'Shops',
       key: 'id'
     }
+  },
+  user_id: {
+    type: DataTypes.INTEGER,
+    references: {
+      model: 'Users',
+      key: 'id'
+    },
+    allowNull: true
   }
 });
 

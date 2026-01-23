@@ -31,7 +31,27 @@ exports.registerOwner = async (req, res) => {
         }, { transaction: t });
 
         await t.commit(); // Simpan permanen jika semua sukses
-        res.status(201).json({ message: "Registrasi Berhasil", userId: newUser.id });
+
+        // Generate Token immediately
+        const token = jwt.sign(
+            { id: newUser.id, role: newUser.role, shop_id: newUser.shop_id },
+            process.env.JWT_SECRET || 'secret_usahaku',
+            { expiresIn: '1d' }
+        );
+
+        res.status(201).json({
+            message: "Registrasi Berhasil",
+            userId: newUser.id,
+            token,
+            user: {
+                id: newUser.id,
+                nama: newUser.nama,
+                role: newUser.role,
+                shop_id: newUser.shop_id,
+                shop_name: newShop.nama_toko,
+                shop_logo: newShop.logo
+            }
+        });
 
     } catch (error) {
         await t.rollback(); // Batalkan semua jika ada satu saja yang gagal
@@ -81,14 +101,25 @@ exports.addStaff = async (req, res) => {
     try {
         const { nama, email, password } = req.body;
 
+        // Validasi Input
+        if (!nama || !email || !password) {
+            return res.status(400).json({ error: "Nama, Email, dan Password wajib diisi" });
+        }
+
+        // req.user didapat dari middleware verifyToken
+        const ownerShopId = req.user.shop_id;
+
+        // Critical Check: Ensure Owner has a valid Shop ID
+        if (!ownerShopId) {
+            return res.status(400).json({ error: "Akun Anda tidak terhubung dengan Toko. Silakan login ulang atau hubungi support." });
+        }
+
         // Cek apakah email staff sudah terdaftar
         const existingStaff = await User.findOne({ where: { email } });
         if (existingStaff) {
             return res.status(400).json({ error: "Email staff sudah digunakan" });
         }
 
-        // req.user didapat dari middleware verifyToken
-        const ownerShopId = req.user.shop_id;
         const hashedPassword = await bcrypt.hash(password, 10);
 
         const newStaff = await User.create({
@@ -101,9 +132,11 @@ exports.addStaff = async (req, res) => {
 
         res.status(201).json({
             message: "Staff berhasil ditambahkan",
-            staffId: newStaff.id
+            staffId: newStaff.id,
+            staffName: newStaff.nama
         });
     } catch (error) {
+        console.error("Add Staff Error:", error);
         res.status(500).json({ error: error.message });
     }
 };

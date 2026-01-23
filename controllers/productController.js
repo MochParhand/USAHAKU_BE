@@ -24,8 +24,22 @@ exports.getCategories = async (req, res) => {
 exports.createCategory = async (req, res) => {
     try {
         const { nama } = req.body;
+
+        // Check for duplicate name
+        const existingCategory = await Category.findOne({
+            where: {
+                nama: { [Op.iLike]: nama.trim() },
+                shop_id: req.user.shop_id,
+                is_deleted: false
+            }
+        });
+
+        if (existingCategory) {
+            return res.status(400).json({ error: "Nama kategori sudah ada!" });
+        }
+
         const category = await Category.create({
-            nama,
+            nama: nama.trim(),
             shop_id: req.user.shop_id
         });
         res.status(201).json(category);
@@ -141,6 +155,23 @@ exports.createProduct = async (req, res) => {
 
         let { nama, harga, harga_dasar, stok, min_stok, barcode, is_jasa, kategori_id } = req.body;
 
+        // Check for duplicate name
+        const existingProduct = await Product.findOne({
+            where: {
+                nama,
+                shop_id: req.user.shop_id,
+                is_deleted: false
+            }
+        });
+
+        if (existingProduct) {
+            // Delete uploaded file if exists to prevent clutter
+            if (req.file && fs.existsSync(req.file.path)) {
+                fs.unlinkSync(req.file.path);
+            }
+            return res.status(400).json({ error: "Nama barang sudah digunakan, mohon gunakan nama lain." });
+        }
+
         // Parse "FormData" strings to correct types
         harga = !isNaN(parseInt(harga)) ? parseInt(harga) : 0;
         harga_dasar = !isNaN(parseInt(harga_dasar)) ? parseInt(harga_dasar) : 0;
@@ -170,6 +201,13 @@ exports.createProduct = async (req, res) => {
         res.status(201).json(product);
     } catch (error) {
         console.error("Create Product Error:", error);
+        // Clean up file on error
+        if (req.file && fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+        }
+        if (error.name === 'SequelizeValidationError' || error.name === 'SequelizeUniqueConstraintError') {
+            return res.status(400).json({ error: error.message });
+        }
         res.status(500).json({ error: error.message });
     }
 };
@@ -178,6 +216,25 @@ exports.updateProduct = async (req, res) => {
     try {
         const { id } = req.params;
         let { nama, harga, harga_dasar, stok, min_stok, barcode, is_jasa, kategori_id } = req.body;
+
+        // Check for duplicate name if name is being updated
+        if (nama) {
+            const existingProduct = await Product.findOne({
+                where: {
+                    nama,
+                    shop_id: req.user.shop_id,
+                    is_deleted: false,
+                    id: { [Op.ne]: id }
+                }
+            });
+
+            if (existingProduct) {
+                if (req.file && fs.existsSync(req.file.path)) {
+                    fs.unlinkSync(req.file.path);
+                }
+                return res.status(400).json({ error: "Nama barang sudah digunakan, mohon gunakan nama lain." });
+            }
+        }
 
         const updateData = {
             nama,
@@ -217,6 +274,16 @@ exports.updateProduct = async (req, res) => {
 
         res.json({ message: "Product updated" });
     } catch (error) {
+        if (req.file && fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+        }
+        if (error.name === 'SequelizeValidationError' || error.name === 'SequelizeUniqueConstraintError') {
+            return res.status(400).json({ error: error.message });
+        }
+        if (error.name === 'SequelizeDatabaseError' && error.parent && error.parent.code === '22P02') {
+            // Invalid text representation (e.g. string ID for integer column)
+            return res.status(404).json({ error: "Product not found (Invalid ID)" });
+        }
         res.status(500).json({ error: error.message });
     }
 };

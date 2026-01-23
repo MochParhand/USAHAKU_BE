@@ -14,7 +14,8 @@ exports.createPurchase = async (req, res) => {
             supplier,
             total_biaya,
             keterangan,
-            shop_id: req.user.shop_id
+            shop_id: req.user.shop_id,
+            user_id: req.user.id // Track creator
         }, { transaction: t });
 
         for (const item of items) {

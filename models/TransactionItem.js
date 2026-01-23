@@ -15,7 +15,7 @@ const TransactionItem = sequelize.define('TransactionItem', {
     allowNull: false
   },
   transaction_id: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.UUID,
     references: {
       model: 'Transactions',
       key: 'id'
@@ -29,7 +29,7 @@ const TransactionItem = sequelize.define('TransactionItem', {
     }
   },
   nama_barang: { // Snapshot of name in case product is deleted/renamed
-    type: DataTypes.STRING 
+    type: DataTypes.STRING
   }
 });
 

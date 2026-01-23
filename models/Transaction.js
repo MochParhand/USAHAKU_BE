@@ -2,6 +2,11 @@ const { DataTypes } = require('sequelize');
 const sequelize = require('../config/db');
 
 const Transaction = sequelize.define('Transaction', {
+  id: {
+    type: DataTypes.UUID,
+    defaultValue: DataTypes.UUIDV4,
+    primaryKey: true
+  },
   tanggal: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW
@@ -32,6 +37,14 @@ const Transaction = sequelize.define('Transaction', {
       model: 'Shops',
       key: 'id'
     }
+  },
+  user_id: {
+    type: DataTypes.INTEGER,
+    references: {
+      model: 'Users',
+      key: 'id'
+    },
+    allowNull: true // Allow null for legacy data
   },
   is_deleted: {
     type: DataTypes.BOOLEAN,
