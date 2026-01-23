@@ -33,8 +33,9 @@ exports.registerOwner = async (req, res) => {
         await t.commit(); // Simpan permanen jika semua sukses
 
         // Generate Token immediately
+        // EXPLICITLY SET ROLE TO 'owner' to avoid any sequelize hook issues or defaults
         const token = jwt.sign(
-            { id: newUser.id, role: newUser.role, shop_id: newUser.shop_id },
+            { id: newUser.id, role: 'owner', shop_id: newUser.shop_id },
             process.env.JWT_SECRET || 'secret_usahaku',
             { expiresIn: '1d' }
         );
@@ -46,7 +47,7 @@ exports.registerOwner = async (req, res) => {
             user: {
                 id: newUser.id,
                 nama: newUser.nama,
-                role: newUser.role,
+                role: 'owner', // Explicitly set
                 shop_id: newUser.shop_id,
                 shop_name: newShop.nama_toko,
                 shop_logo: newShop.logo
